@@ -1,5 +1,5 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Weekly Test Manager</title><meta name="theme-color" content="#1e40af">
+<title>Weekly Test Manager</title><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-192.png"><meta name="theme-color" content="#1e40af">
 <link rel="icon" href="assets/icon-192.png"><style>*{box-sizing:border-box}body{margin:0;font-family:system-ui,'Noto Sans Devanagari',sans-serif;background:#f1f5f9;color:#0f172a}
 main{padding:12px 12px 80px;max-width:900px;margin:auto}nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#1e40af;z-index:5}
 nav button{flex:1;background:none;border:0;color:#cbd5e1;padding:14px 2px;font-size:13px}nav .on{color:#fff;font-weight:700;border-top:3px solid #fff}
@@ -99,6 +99,7 @@ else if(a=='togm'){const m=S.master.find(x=>x.id==id);upd('master',id,{active:m.
 else if(a=='pdf')window.print();
 else if(a=='copy'){const txt=$('#rp').textContent;try{await navigator.clipboard.writeText(txt);toast('Report copied')}catch{const f=$('#fb');f.hidden=false;f.value=txt;f.select();toast('Copy blocked: text selected, copy it manually',1)}}});
 document.addEventListener('change',e=>{const a=e.target.dataset.a;if(a=='wk'){S.wid=e.target.value;render()}if(a=='fc'){S.fc=e.target.value;render()}if(a=='fs'){S.fs=e.target.value;render()}});
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
 load().then(async()=>{if(ensureWeek()){await load();S.wid=S.weeks[0]?.id}render()});navigator.storage?.persist?.();
 
 </script></body></html>
