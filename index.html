@@ -49,7 +49,7 @@ return `${wsel()} <button class="pri np" data-a="newweek">Create New Week</butto
 <h4>Today's tests · ${fmt(today())} (${tdy().length})</h4>${tdy().map(card).join('')||'<p>No tests today.</p>'}<h4>Pending tests</h4>${ts.filter(t=>st(t)=='PENDING').map(card).join('')||'<p>None</p>'}<h4>Incomplete activities</h4>${ts.filter(t=>st(t)=='INCOMPLETE').map(card).join('')||'<p>None</p>'}`}
 function week(){const w=W();if(!w)return noWeek();let ts=tests().filter(t=>(!S.fc||t.classId==S.fc)&&(!S.fs||st(t)==S.fs));
 return `${wsel()}<div class="np"><select data-a="fc"><option value="">All classes</option>${opts('classes').map(o=>`<option value="${o[0]}" ${o[0]==S.fc?'selected':''}>${E(o[1])}</option>`)}</select>
-<select data-a="fs"><option value="">All statuses</option>${['COMPLETED','INCOMPLETE','PENDING','NOT_STARTED'].map(s=>`<option ${s==S.fs?'selected':''}>${s}</option>`)}</select><button class="pri" data-a="addtest">+ Add test</button></div>
+<select data-a="fs"><option value="">All statuses</option>${['COMPLETED','INCOMPLETE','PENDING','NOT_STARTED'].map(s=>`<option ${s==S.fs?'selected':''}>${s}</option>`)}</select><button class="pri" data-a="addtest">+ Add test</button><button data-a="fill">Fill from master</button></div>
 <h3>${fmt(w.start)} to ${fmt(w.end)} (${ts.length})</h3>${ts.map(card).join('')||'<p>No tests.</p>'}`}
 function reportText(){const w=W(),ts=tests(),act=ts.filter(t=>st(t)!='PENDING'&&t.p[0]);
 const blk=t=>`Class: ${nm('classes',t.classId)}\nDate: ${fmt(t.date)} (${DAYS[wd(t.date)]})\nSubject: ${nm('subjects',t.subjectId)}\nTeacher: ${nm('teachers',t.teacherId)||'-'}\nStatus: ${st(t)}\nCircles: ${t.p.map(v=>v?'●':'○').join(' ')}\nPending: ${out(t).join(', ')||'None'}${t.pending&&t.reason?'\nReason: '+t.reason:''}`;
@@ -67,15 +67,17 @@ $('#app').innerHTML=`<main><div class="np"><button data-a="restore" style="float
 const T=id=>S.tests.find(t=>t.id==id),tf=(v={})=>[{k:'classId',l:'Class',o:opts('classes'),v:v.classId},{k:'subjectId',l:'Subject',o:opts('subjects'),v:v.subjectId},{k:'teacherId',l:'Teacher (optional)',o:[['','—'],...opts('teachers')],v:v.teacherId},{k:'date',l:'Date',t:'date',r:1,v:v.date||W()?.start},{k:'notes',l:'Notes',v:v.notes}];
 const need=()=>S.classes.length&&S.subjects.length?true:(toast('Add classes and subjects in Master first',1),false);
 const nameForm=(c,l)=>form('Add '+l,[{k:'name',l:'Name',r:1}],d=>d.name.trim()&&put(c,{name:d.name.trim(),active:true}));
-async function newWeek(d){const start=mon(d),ex=S.weeks.find(w=>w.start==start);if(ex){if(confirm('That week already exists. Open it? (Cancel = do not create a duplicate)')){S.wid=ex.id;S.tab='week';render()}return}
+async function newWeek(d){const start=mon(d),ex=S.weeks.find(w=>w.start==start);if(ex){if(confirm('That week already exists. Open it? (Cancel = do not create a duplicate)')){if(fillWeek(ex,actM()))sv();S.wid=ex.id;S.tab='week';await load();S.wid=ex.id;render();toast('Opened. Missing tests from master were added')}return}
 const id=uid();(DB.weeks=DB.weeks||[]).push({id,start,end:add(start,6)});DB.tests=DB.tests||[];
 for(const m of S.master.filter(m=>m.active!==false&&S.classes.find(c=>c.id==m.classId&&c.active!==false)))DB.tests.push({id:uid(),weekId:id,masterId:m.id,classId:m.classId,subjectId:m.subjectId,teacherId:m.teacherId||'',date:add(start,m.weekday),notes:m.notes||'',p:[false,false,false,false],pending:false,reason:'',archived:false});
 sv();await load();S.wid=id;S.tab='dash';render();toast('Week created')}
 const tdy=()=>S.tests.filter(t=>t.date==today()&&!t.archived).sort((a,b)=>nm('classes',a.classId).localeCompare(nm('classes',b.classId)));
+function fillWeek(w,ms){let ch=false;DB.tests=DB.tests||[];for(const m of ms)if(!DB.tests.some(t=>t.weekId==w.id&&t.masterId==m.id)){DB.tests.push({id:uid(),weekId:w.id,masterId:m.id,classId:m.classId,subjectId:m.subjectId,teacherId:m.teacherId||'',date:add(w.start,m.weekday),notes:m.notes||'',p:[false,false,false,false],pending:false,reason:'',archived:false});ch=true}return ch}
+const actM=()=>S.master.filter(m=>m.active!==false&&S.classes.find(c=>c.id==m.classId&&c.active!==false));
 function ensureWeek(){const s=mon(today()),ms=S.master.filter(m=>m.active!==false&&S.classes.find(c=>c.id==m.classId&&c.active!==false));if(!ms.length)return false;let w=S.weeks.find(w=>w.start==s),ch=false;
 if(!w){w={id:uid(),start:s,end:add(s,6)};(DB.weeks=DB.weeks||[]).push(w);ch=true}
 DB.tests=DB.tests||[];for(const m of ms)if(!DB.tests.some(t=>t.weekId==w.id&&t.masterId==m.id)){DB.tests.push({id:uid(),weekId:w.id,masterId:m.id,classId:m.classId,subjectId:m.subjectId,teacherId:m.teacherId||'',date:add(s,m.weekday),notes:m.notes||'',p:[false,false,false,false],pending:false,reason:'',archived:false});ch=true}
-if(ch)sv();return ch}
+for(const x of S.weeks.filter(x=>x.start>s&&x.id!=w.id))if(fillWeek(x,ms))ch=true;if(ch)sv();return ch}
 const saveTest=(id,d)=>{const w=W();if(d.date<w.start||d.date>w.end&&!confirm('This date is outside the selected week. OK = keep it in this week as an exception. Cancel = go back.'))return;id?upd('tests',id,d):put('tests',{...d,weekId:w.id,p:[false,false,false,false],pending:false,reason:'',archived:false})};
 document.addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.tab){S.tab=b.dataset.tab;return render()}const a=b.dataset.a,id=b.dataset.id,t=id&&T(id);if(!a)return;
 if(a=='backup'){const l=document.createElement('a');l.href=URL.createObjectURL(new Blob([JSON.stringify(DB)],{type:'application/json'}));l.download='weekly-test-backup-'+today()+'.json';l.click()}
@@ -83,6 +85,7 @@ else if(a=='restore'){const i=document.createElement('input');i.type='file';i.ac
 else if(a=='newweek')form('Create week containing date',[{k:'d',l:'Date',t:'date',v:today(),r:1}],d=>newWeek(d.d));
 else if(a=='open'){S.wid=id;S.tab='week';render()}
 else if(a=='circ'){const i=+b.dataset.i,p=[...t.p];if(p[i]){if(!confirm(`Undo "${STEPS[i]}"?`+(i<3?' Later steps will also be reset.':'')))return;for(let j=i;j<4;j++)p[j]=false}else p[i]=true;upd('tests',id,{p})}
+else if(a=='fill'){if(fillWeek(W(),actM())){sv();run(()=>{},'Added missing tests from master')}else toast('Nothing missing')}
 else if(a=='addtest'){if(need())form('Add test',tf(),d=>saveTest(null,d))}
 else if(a=='edit')form('Edit test',tf(t),d=>saveTest(id,d));
 else if(a=='pend')form('Mark pending (not conducted)',[{k:'reason',l:'Reason (optional)'}],d=>{if(t.p.some(Boolean)&&!confirm('This resets all four circles. Continue?'))return;upd('tests',id,{pending:true,reason:d.reason,p:[false,false,false,false]})});
