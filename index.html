@@ -8,7 +8,7 @@ button,select,input{font:inherit;min-height:40px}button{border-radius:8px;border
 .g{display:grid;grid-template-columns:1fr 1fr;gap:8px}.sc b{font-size:28px;display:block}.sc{margin:0}
 .b{font-size:12px;padding:2px 8px;border-radius:12px;color:#fff;float:right}.COMPLETED{background:#15803d}.INCOMPLETE{background:#b45309}.PENDING{background:#b91c1c}.NOT_STARTED{background:#475569}
 .cs{display:flex;gap:6px;margin:6px 0}.c{width:64px;min-height:56px;font-size:24px;border-radius:12px;line-height:1;padding:2px}.c small{display:block;font-size:10px}.c.d{background:#dcfce7;border-color:#15803d;color:#15803d}.c:disabled{opacity:.4}
-dialog{border:0;border-radius:12px;width:min(92vw,420px)}dialog label{display:block;margin:8px 0}dialog input,dialog select{width:100%}
+dialog{border:0;border-radius:12px;width:min(92vw,420px)}dialog label{display:block;margin:8px 0}dialog input,dialog select,dialog textarea{width:100%}dialog{max-height:90vh;overflow:auto}
 #toast{position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:8px 14px;border-radius:8px;display:none;z-index:9}#toast.e{background:#b91c1c}
 pre{white-space:pre-wrap;background:#fff;padding:10px;border-radius:8px;font-family:inherit}.c0{padding:2rem;text-align:center}.row{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e2e8f0;padding:4px 0}
 @media print{.np,nav{display:none!important}body{background:#fff}main{padding:0}}
@@ -26,13 +26,13 @@ const toast=(m,e)=>{const t=$('#toast');t.textContent=m;t.className=e?'e':'';t.s
 const nm=(c,id)=>(S[c]?.find(x=>x.id==id)||{}).name||'';
 async function load(){for(const c of COLS)S[c]=[...(DB[c]||[])];
 S.weeks.sort((a,b)=>b.start.localeCompare(a.start));if(!S.weeks.find(w=>w.id==S.wid))S.wid=S.weeks[0]?.id||null}
-const run=async(f,m)=>{try{await f();await load();render();toast(m)}catch(x){toast('Error: '+x.message,1)}};
+const run=async(f,m)=>{try{await f();await load();if(ensureWeek())await load();render();toast(m)}catch(x){toast('Error: '+x.message,1)}};
 const put=(c,d)=>run(()=>{(DB[c]=DB[c]||[]).push({...d,id:uid()});sv()},'Saved');
 const upd=(c,id,d)=>run(()=>{DB[c]=DB[c].map(x=>x.id==id?{...x,...d}:x);sv()},'Saved');
 const st=t=>t.archived?'ARCHIVED':t.pending?'PENDING':t.p.every(Boolean)?'COMPLETED':!t.p[0]?'NOT_STARTED':'INCOMPLETE';
 const W=()=>S.weeks.find(w=>w.id==S.wid),tests=()=>S.tests.filter(t=>t.weekId==S.wid&&!t.archived).sort((a,b)=>a.date.localeCompare(b.date));
 const out=t=>st(t)=='PENDING'?['Test not conducted']:STEPS.filter((_,i)=>!t.p[i]);
-function form(title,fs,cb){const d=$('#dlg');d.innerHTML=`<form method="dialog"><h3>${title}</h3>${fs.map(f=>`<label>${f.l}${f.o?`<select name="${f.k}">${f.o.map(o=>`<option value="${E(o[0])}" ${o[0]==f.v?'selected':''}>${E(o[1])}</option>`).join('')}</select>`:`<input name="${f.k}" type="${f.t||'text'}" value="${E(f.v)}" ${f.r?'required':''}>`}</label>`).join('')}<button value="x" formnovalidate>Cancel</button><button value="ok" class="pri">Save</button></form>`;
+function form(title,fs,cb){const d=$('#dlg');d.innerHTML=`<form method="dialog"><h3>${title}</h3>${fs.map(f=>`<label>${f.l}${f.o?`<select name="${f.k}">${f.o.map(o=>`<option value="${E(o[0])}" ${o[0]==f.v?'selected':''}>${E(o[1])}</option>`).join('')}</select>`:`${f.t=='area'?`<textarea name="${f.k}" rows="7">${E(f.v)}</textarea>`:`<input name="${f.k}" type="${f.t||'text'}" value="${E(f.v)}" ${f.r?'required':''}>`}`}</label>`).join('')}<button value="x" formnovalidate>Cancel</button><button value="ok" class="pri">Save</button></form>`;
 const f=d.querySelector('form');f.onsubmit=e=>{if(e.submitter.value=='ok')cb(Object.fromEntries(new FormData(f)))};d.showModal()}
 const opts=c=>S[c].filter(x=>x.active!==false).sort((a,b)=>a.name.localeCompare(b.name)).map(x=>[x.id,x.name]);
 function card(t){const s=st(t),en=i=>!t.pending&&t.p.slice(0,i).every(Boolean);
@@ -46,7 +46,7 @@ function dash(){const w=W();if(!w)return noWeek()+'<p>First add classes, subject
 return `${wsel()} <button class="pri np" data-a="newweek">Create New Week</button><h3>${fmt(w.start)} to ${fmt(w.end)}</h3>
 <div class="g"><div class="sc">Total tests<b>${ts.length}</b></div><div class="sc">Completed<b>${n('COMPLETED')}</b></div><div class="sc">Incomplete<b>${n('INCOMPLETE')}</b></div><div class="sc">Pending<b>${n('PENDING')}</b></div></div>
 <p>Not started: ${n('NOT_STARTED')} (Completed + Incomplete + Pending + Not started = ${ts.length})</p>
-<h4>Pending tests</h4>${ts.filter(t=>st(t)=='PENDING').map(card).join('')||'<p>None</p>'}<h4>Incomplete activities</h4>${ts.filter(t=>st(t)=='INCOMPLETE').map(card).join('')||'<p>None</p>'}`}
+<h4>Today's tests · ${fmt(today())} (${tdy().length})</h4>${tdy().map(card).join('')||'<p>No tests today.</p>'}<h4>Pending tests</h4>${ts.filter(t=>st(t)=='PENDING').map(card).join('')||'<p>None</p>'}<h4>Incomplete activities</h4>${ts.filter(t=>st(t)=='INCOMPLETE').map(card).join('')||'<p>None</p>'}`}
 function week(){const w=W();if(!w)return noWeek();let ts=tests().filter(t=>(!S.fc||t.classId==S.fc)&&(!S.fs||st(t)==S.fs));
 return `${wsel()}<div class="np"><select data-a="fc"><option value="">All classes</option>${opts('classes').map(o=>`<option value="${o[0]}" ${o[0]==S.fc?'selected':''}>${E(o[1])}</option>`)}</select>
 <select data-a="fs"><option value="">All statuses</option>${['COMPLETED','INCOMPLETE','PENDING','NOT_STARTED'].map(s=>`<option ${s==S.fs?'selected':''}>${s}</option>`)}</select><button class="pri" data-a="addtest">+ Add test</button></div>
@@ -57,8 +57,8 @@ const secs=[['TESTS NOT CONDUCTED / PENDING',ts.filter(t=>st(t)=='PENDING')],['C
 const c=s=>ts.filter(t=>st(t)==s).length;
 return `WEEKLY TEST REPORT\nWeek: ${fmt(w.start)} to ${fmt(w.end)}\nTotal ${ts.length} | Completed ${c('COMPLETED')} | Incomplete ${c('INCOMPLETE')} | Pending ${c('PENDING')} | Not started ${c('NOT_STARTED')}\n\n`+secs.map((s,i)=>`${i+1}. ${s[0]} (${s[1].length})\n\n`+(s[1].map(blk).join('\n\n')||'None')).join('\n\n')}
 function rep(){if(!W())return noWeek();return `${wsel()}<div class="np"><button class="pri" data-a="copy">Copy Report</button><button data-a="pdf">Download PDF</button></div><p class="np"><small>PDF: choose "Save as PDF" in the print dialog (supports Hindi).</small></p><textarea id="fb" class="np" hidden style="width:100%" rows="8"></textarea><pre id="rp" lang="hi">${E(reportText())}</pre>`}
-function master(){const li=(c,l)=>`<h4>${l} <button data-a="add_${c}" class="np">+ Add</button></h4>`+S[c].map(x=>`<div class="row"><span>${E(x.name)}${x.active===false?' (archived)':''}</span><span><button data-a="ren" data-c="${c}" data-id="${x.id}">Edit</button><button data-a="tog" data-c="${c}" data-id="${x.id}">${x.active===false?'Restore':'Archive'}</button></span></div>`).join('');
-return li('classes','Classes')+li('subjects','Subjects')+li('teachers','Teachers')+`<h4>Master timetable <button data-a="addm">+ Add entry</button></h4>`+S.master.sort((a,b)=>a.weekday-b.weekday).map(m=>`<div class="row"><span>${DAYS[m.weekday]} · ${E(nm('classes',m.classId))} · ${E(nm('subjects',m.subjectId))} · ${E(nm('teachers',m.teacherId)||'-')}${m.active===false?' (disabled)':''}</span><span><button data-a="editm" data-id="${m.id}">Edit</button><button data-a="togm" data-id="${m.id}">${m.active===false?'Enable':'Disable'}</button></span></div>`).join('')}
+function master(){const li=(c,l)=>`<h4>${l} <button data-a="add_${c}" class="np">+ Add</button><button data-a="many_${c}" class="np">+ Add many</button></h4>`+S[c].map(x=>`<div class="row"><span>${E(x.name)}${x.active===false?' (archived)':''}</span><span><button data-a="ren" data-c="${c}" data-id="${x.id}">Edit</button><button data-a="tog" data-c="${c}" data-id="${x.id}">${x.active===false?'Restore':'Archive'}</button></span></div>`).join('');
+return li('classes','Classes')+li('subjects','Subjects')+li('teachers','Teachers')+`<h4>Master timetable <button data-a="addm">+ Add entry</button><button data-a="bulkm" class="pri">Add full week for a class</button></h4>`+S.master.sort((a,b)=>a.weekday-b.weekday).map(m=>`<div class="row"><span>${DAYS[m.weekday]} · ${E(nm('classes',m.classId))} · ${E(nm('subjects',m.subjectId))} · ${E(nm('teachers',m.teacherId)||'-')}${m.active===false?' (disabled)':''}</span><span><button data-a="editm" data-id="${m.id}">Edit</button><button data-a="togm" data-id="${m.id}">${m.active===false?'Enable':'Disable'}</button></span></div>`).join('')}
 const hist=()=>`<h3>Previous weeks</h3>`+S.weeks.map(w=>`<div class="row"><span>${fmt(w.start)} to ${fmt(w.end)}</span><button data-a="open" data-id="${w.id}">Open</button></div>`).join('')+'<br>'+`<button class="pri" data-a="newweek">Create New Week</button>`;
 const arch=()=>`<h3>Archived tests</h3>`+(S.tests.filter(t=>t.archived).map(t=>`<div class="card">${fmt(t.date)} · ${E(nm('classes',t.classId))} · ${E(nm('subjects',t.subjectId))} · ${st({...t,archived:false})}<br><button data-a="restore" data-id="${t.id}">Restore</button></div>`).join('')||'<p>None</p>');
 const V={dash,week,rep,master,hist,arch};
@@ -71,6 +71,11 @@ async function newWeek(d){const start=mon(d),ex=S.weeks.find(w=>w.start==start);
 const id=uid();(DB.weeks=DB.weeks||[]).push({id,start,end:add(start,6)});DB.tests=DB.tests||[];
 for(const m of S.master.filter(m=>m.active!==false&&S.classes.find(c=>c.id==m.classId&&c.active!==false)))DB.tests.push({id:uid(),weekId:id,masterId:m.id,classId:m.classId,subjectId:m.subjectId,teacherId:m.teacherId||'',date:add(start,m.weekday),notes:m.notes||'',p:[false,false,false,false],pending:false,reason:'',archived:false});
 sv();await load();S.wid=id;S.tab='dash';render();toast('Week created')}
+const tdy=()=>S.tests.filter(t=>t.date==today()&&!t.archived).sort((a,b)=>nm('classes',a.classId).localeCompare(nm('classes',b.classId)));
+function ensureWeek(){const s=mon(today()),ms=S.master.filter(m=>m.active!==false&&S.classes.find(c=>c.id==m.classId&&c.active!==false));if(!ms.length)return false;let w=S.weeks.find(w=>w.start==s),ch=false;
+if(!w){w={id:uid(),start:s,end:add(s,6)};(DB.weeks=DB.weeks||[]).push(w);ch=true}
+DB.tests=DB.tests||[];for(const m of ms)if(!DB.tests.some(t=>t.weekId==w.id&&t.masterId==m.id)){DB.tests.push({id:uid(),weekId:w.id,masterId:m.id,classId:m.classId,subjectId:m.subjectId,teacherId:m.teacherId||'',date:add(s,m.weekday),notes:m.notes||'',p:[false,false,false,false],pending:false,reason:'',archived:false});ch=true}
+if(ch)sv();return ch}
 const saveTest=(id,d)=>{const w=W();if(d.date<w.start||d.date>w.end&&!confirm('This date is outside the selected week. OK = keep it in this week as an exception. Cancel = go back.'))return;id?upd('tests',id,d):put('tests',{...d,weekId:w.id,p:[false,false,false,false],pending:false,reason:'',archived:false})};
 document.addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.tab){S.tab=b.dataset.tab;return render()}const a=b.dataset.a,id=b.dataset.id,t=id&&T(id);if(!a)return;
 if(a=='backup'){const l=document.createElement('a');l.href=URL.createObjectURL(new Blob([JSON.stringify(DB)],{type:'application/json'}));l.download='weekly-test-backup-'+today()+'.json';l.click()}
@@ -84,14 +89,16 @@ else if(a=='pend')form('Mark pending (not conducted)',[{k:'reason',l:'Reason (op
 else if(a=='resume'){if(confirm('Resume normal workflow? Circles stay empty.'))upd('tests',id,{pending:false,reason:''})}
 else if(a=='arch'){if(confirm('Archive this test? It can be restored later.'))upd('tests',id,{archived:true})}
 else if(a=='restore'){if(confirm('Restore this test?'))upd('tests',id,{archived:false})}
+else if(a.startsWith('many_')){const c=a.slice(5);form('Add many (one per line)',[{k:'n',l:'Names, one per line',t:'area',v:''}],d=>{const ex=new Set(S[c].map(x=>x.name.toLowerCase())),L=[...new Set(d.n.split('\n').map(x=>x.trim()).filter(Boolean))].filter(x=>!ex.has(x.toLowerCase()));if(!L.length)return toast('Nothing new to add',1);run(()=>{DB[c]=DB[c]||[];L.forEach(x=>DB[c].push({id:uid(),name:x,active:true}));sv()},L.length+' added')})}
 else if(a.startsWith('add_')){const c=a.slice(4);nameForm(c,c)}
 else if(a=='ren')form('Edit name',[{k:'name',l:'Name',r:1,v:nm(b.dataset.c,id)}],d=>upd(b.dataset.c,id,{name:d.name.trim()}));
 else if(a=='tog'){const x=S[b.dataset.c].find(x=>x.id==id);upd(b.dataset.c,id,{active:x.active===false})}
 else if(a=='addm'||a=='editm'){if(!need())return;const m=S.master.find(x=>x.id==id)||{};form('Master entry',[{k:'classId',l:'Class',o:opts('classes'),v:m.classId},{k:'weekday',l:'Day',o:DAYS.map((d,i)=>[i,d]),v:m.weekday},{k:'subjectId',l:'Subject',o:opts('subjects'),v:m.subjectId},{k:'teacherId',l:'Teacher',o:[['','—'],...opts('teachers')],v:m.teacherId},{k:'notes',l:'Notes',v:m.notes}],d=>{d.weekday=+d.weekday;id?upd('master',id,d):put('master',{...d,active:true})})}
+else if(a=='bulkm'){if(!need())return;const so=[['','— none —'],...opts('subjects')],to=[['','— no teacher —'],...opts('teachers')];form('Add full week for one class',[{k:'classId',l:'Class',o:opts('classes')},...DAYS.flatMap((d,i)=>[{k:'s'+i,l:d+' – Subject',o:so},{k:'t'+i,l:d+' – Teacher',o:to}])],d=>{const rows=DAYS.map((_,i)=>({weekday:i,subjectId:d['s'+i],teacherId:d['t'+i]})).filter(r=>r.subjectId);if(!rows.length)return toast('Choose at least one subject',1);run(()=>{DB.master=DB.master||[];rows.forEach(r=>{if(!DB.master.some(m=>m.classId==d.classId&&m.weekday==r.weekday&&m.subjectId==r.subjectId))DB.master.push({id:uid(),classId:d.classId,notes:'',active:true,...r})});sv()},rows.length+' entries added')})}
 else if(a=='togm'){const m=S.master.find(x=>x.id==id);upd('master',id,{active:m.active===false})}
 else if(a=='pdf')window.print();
 else if(a=='copy'){const txt=$('#rp').textContent;try{await navigator.clipboard.writeText(txt);toast('Report copied')}catch{const f=$('#fb');f.hidden=false;f.value=txt;f.select();toast('Copy blocked: text selected, copy it manually',1)}}});
 document.addEventListener('change',e=>{const a=e.target.dataset.a;if(a=='wk'){S.wid=e.target.value;render()}if(a=='fc'){S.fc=e.target.value;render()}if(a=='fs'){S.fs=e.target.value;render()}});
-load().then(render);navigator.storage?.persist?.();
+load().then(async()=>{if(ensureWeek()){await load();S.wid=S.weeks[0]?.id}render()});navigator.storage?.persist?.();
 
 </script></body></html>
